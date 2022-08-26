@@ -1,4 +1,4 @@
-package co.edu.udea.compumovil.gr01_20221.dojoopencv;
+package co.edu.udea.compumovil.gr0120221.dojoopencv;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -17,12 +17,25 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 
 public class MainActivity extends CameraActivity {
     private static String LOGCAT = "OpenCV_Log";
     private CameraBridgeViewBase mOpenCvCameraView;
+    private File cascadeFile;
+
+    static {
+        System.loadLibrary("dojoopencv");
+    }
+
+    public native void FindFeatures(long imGray, long imRGB);
+    public native void InitDetector(String filePath);
+    public native void DetectFaces(long imGray, long imRGB);
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -57,13 +70,15 @@ public class MainActivity extends CameraActivity {
             Mat inputRgba = inputFrame.rgba();
             Mat inputGray = inputFrame.gray();
 
-            MatOfPoint corners = new MatOfPoint();
-            Imgproc.goodFeaturesToTrack(inputGray, corners, 20, 0.01, 10, new Mat(), 3, false);
-            Point[] cornersArr = corners.toArray();
+            DetectFaces(inputGray.getNativeObjAddr(), inputRgba.getNativeObjAddr());
 
-            for(int i = 0; i < cornersArr.length; i++) {
-                Imgproc.circle(inputRgba, cornersArr[i], 10, new Scalar( 0, 255, 0));
-            }
+            //MatOfPoint corners = new MatOfPoint();
+            //Imgproc.goodFeaturesToTrack(inputGray, corners, 20, 0.01, 10, new Mat(), 3, false);
+            //Point[] cornersArr = corners.toArray();
+
+            //for (int i = 0; i < cornersArr.length; i++) {
+            //    Imgproc.circle(inputRgba, cornersArr[i], 10, new Scalar(0, 255, 0));
+            //}
 
             return inputRgba;
         }
@@ -74,11 +89,29 @@ public class MainActivity extends CameraActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        try {
+            cascadeFile = new File(getCacheDir(), "haarcascade_frontalface_default.xml");
+            if (!cascadeFile.exists()) {
+                InputStream inputStream = getAssets().open("haarcascade_frontalface_default.xml");
+                FileOutputStream outputStream = new FileOutputStream(cascadeFile);
+                byte[] buffer = new byte[2048];
+                int bytesRead = -1;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                inputStream.close();
+                outputStream.close();
+            }
+            InitDetector(cascadeFile.getAbsolutePath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.opencv_surface_view);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(cvCameraViewListener);
 
-        if(OpenCVLoader.initDebug()) {
+        if (OpenCVLoader.initDebug()) {
             Log.d(LOGCAT, "OpenCV Initialized!");
         }
     }
